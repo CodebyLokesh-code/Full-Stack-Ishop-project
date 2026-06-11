@@ -16,27 +16,26 @@ const getData = async (req, res) => {
       dynamic_filter["slug"] = url_query.slug;
     }
 
-    const brands = await BrandModel.find(dynamic_filter).sort({
-      createdAt: -1,
-    }).populate({
-        path:"category_ids",
-        select:"name"
-    })
+    const brands = await BrandModel.find(dynamic_filter)
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "category_ids",
+        select: "name",
+      });
 
     res.send({
       flag: 1,
       brands,
       image_path: "/images/brand/",
     });
-
   } catch (error) {
+    console.log(error);
     res.send(message.catch_error);
   }
 };
 
 const create = async (req, res) => {
   try {
-
     const data = req.body;
     const image = req.files?.image;
 
@@ -45,11 +44,13 @@ const create = async (req, res) => {
     }
 
     const brandExist = await BrandModel.findOne({
-      $or: [{ name: data.name || "" }, { slug: data.slug }]
+      $or: [{ name: data.name || "" }, { slug: data.slug }],
     });
 
     if (brandExist) {
-      return res.send(message.general_error("Name and slug must be unique"));
+      return res.send(
+        message.general_error("Name and slug must be unique")
+      );
     }
 
     const imageName = generateRandomNames(image.name);
@@ -67,15 +68,14 @@ const create = async (req, res) => {
     await brand.save();
 
     res.send(message.created_msg("Brand created"));
-
   } catch (error) {
+    console.log(error);
     res.send(message.catch_error);
   }
 };
 
 const deleteData = async (req, res) => {
   try {
-
     const id = req.params.id;
 
     const brand = await BrandModel.findById(id);
@@ -84,12 +84,15 @@ const deleteData = async (req, res) => {
       return res.send(message.general_error("Brand not found"));
     }
 
-    fs.unlinkSync(`public/images/brand/${brand.image_name}`);
+    const imagePath = `public/images/brand/${brand.image_name}`;
+
+    if (fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+    }
 
     await BrandModel.findByIdAndDelete(id);
 
     res.send(message.delete_msg("Brand"));
-
   } catch (error) {
     console.log(error.message);
     res.send(message.catch_error);
@@ -98,35 +101,29 @@ const deleteData = async (req, res) => {
 
 const toggleData = async (req, res) => {
   try {
-
     const { flag, id } = req.params;
 
     const brand = await BrandModel.findById(id);
 
-    if (brand) {
-
-      if (flag == 1) {
-        brand.status = !brand.status;
-      }
-
-      await brand.save();
-
-      res.send(message.general_success("Toggle successfully"));
-
-    } else {
-
-      res.send(message.general_error("Brand not found"));
-
+    if (!brand) {
+      return res.send(message.general_error("Brand not found"));
     }
 
+    if (flag == 1) {
+      brand.status = !brand.status;
+    }
+
+    await brand.save();
+
+    res.send(message.general_success("Toggle successfully"));
   } catch (error) {
+    console.log(error);
     res.send(message.catch_error);
   }
 };
 
 const updateData = async (req, res) => {
   try {
-
     const { id } = req.params;
     const image = req.files?.image;
     const { name, slug } = req.body;
@@ -137,26 +134,44 @@ const updateData = async (req, res) => {
       return res.send(message.general_error("Brand not found"));
     }
 
-    if (image) {
+    const duplicateBrand = await BrandModel.findOne({
+      _id: { $ne: id },
+      $or: [{ name }, { slug }],
+    });
 
+    if (duplicateBrand) {
+      return res.send(
+        message.general_error("Name and slug must be unique")
+      );
+    }
+
+    if (image) {
       const imageName = generateRandomNames(image.name);
       const destination = "./public/images/brand/" + imageName;
 
       await image.mv(destination);
 
-      fs.unlinkSync(`public/images/brand/${brand.image_name}`);
+      const imagePath = `public/images/brand/${brand.image_name}`;
+
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
 
       brand.image_name = imageName;
     }
 
     brand.name = name;
     brand.slug = slug;
-    
+
+    if (req.body.category_ids) {
+      brand.category_ids = JSON.parse(req.body.category_ids);
+    }
 
     await brand.save();
 
-    return res.send(message.general_success("Brand updated"));
-
+    return res.send(
+      message.general_success("Brand updated")
+    );
   } catch (error) {
     console.log(error.message);
     res.send(message.catch_error);

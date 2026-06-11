@@ -3,10 +3,8 @@ const ProductModel = require("../models/ProductModel");
 const { generateRandomNames } = require("../library/helpers");
 const fs = require("fs");
 
-// ================= GET =================
 const getData = async (req, res) => {
   try {
-
     const query = req.query;
     const filter = {};
 
@@ -18,28 +16,20 @@ const getData = async (req, res) => {
       .populate("category_ids", "name")
       .populate("color_ids", "name")
       .populate("brand_id", "name");
-console.log("PRODUCT COUNT =", products.length);
-console.log("PRODUCTS =", products);
     res.send({
-  flag: 1,
-  products,
-  image_path: "/images/products/"
-});
-
+      flag: 1,
+      products,
+      image_path: "/images/products/",
+    });
   } catch (error) {
-    console.log("ERROR =", error.message);
     res.send(message.catch_error);
-    
   }
 };
 
-// ================= CREATE =================
 const create = async (req, res) => {
   try {
-
     const data = req.body;
 
-    // ✅ FILE SAFETY CHECK
     if (!req.files || !req.files.thumbnail) {
       return res.send(message.general_error("Thumbnail required"));
     }
@@ -47,25 +37,25 @@ const create = async (req, res) => {
     const thumbnail = req.files.thumbnail;
     const images = req.files?.other_images;
 
-    // ✅ UNIQUE CHECK
     const exist = await ProductModel.findOne({
-      $or: [
-        { name: data.name },
-        { slug: data.slug },
-        { sku_id: data.sku_id }
-      ]
-    });
+  $or: [
+    { name: data.name },
+    { slug: data.slug },
+    { sku_id: data.sku_id }
+  ]
+});
 
-    if (exist) {
-      return res.send(message.general_error("Name / Slug / SKU already exists"));
-    }
+if (exist) {
+  return res.send(
+    message.general_error("Name / Slug / SKU already exists")
+  );
+}
 
-    // ✅ THUMBNAIL SAVE
     const thumbName = generateRandomNames(thumbnail.name);
     const thumbPath = "./public/images/products/main_images/" + thumbName;
     await thumbnail.mv(thumbPath);
 
-    // ✅ OTHER IMAGES
+    
     let imageArray = [];
 
     if (images) {
@@ -82,7 +72,7 @@ const create = async (req, res) => {
       }
     }
 
-    // ✅ SAFE PARSE
+   
     const category_ids = data.category_ids ? JSON.parse(data.category_ids) : [];
     const color_ids = data.color_ids ? JSON.parse(data.color_ids) : [];
 
@@ -101,13 +91,12 @@ const create = async (req, res) => {
 
       category_ids: category_ids,
       color_ids: color_ids,
-      brand_id: data.brand_id
+      brand_id: data.brand_id,
     });
 
     await product.save();
 
     res.send(message.created_msg("Product created"));
-
   } catch (error) {
     console.log(error.message);
     res.send(message.catch_error);
@@ -117,7 +106,6 @@ const create = async (req, res) => {
 // ================= DELETE =================
 const deleteProduct = async (req, res) => {
   try {
-
     const id = req.params.id;
     const product = await ProductModel.findById(id);
 
@@ -137,7 +125,6 @@ const deleteProduct = async (req, res) => {
     await ProductModel.findByIdAndDelete(id);
 
     res.send(message.delete_msg("Product"));
-
   } catch (error) {
     console.log(error.message);
     res.send(message.catch_error);
@@ -147,7 +134,6 @@ const deleteProduct = async (req, res) => {
 // ================= TOGGLE =================
 const toggleProduct = async (req, res) => {
   try {
-
     const { id, flag } = req.params;
     const product = await ProductModel.findById(id);
 
@@ -164,7 +150,6 @@ const toggleProduct = async (req, res) => {
     await product.save();
 
     res.send(message.general_success("Updated"));
-
   } catch (error) {
     res.send(message.catch_error);
   }
@@ -173,7 +158,6 @@ const toggleProduct = async (req, res) => {
 // ================= UPDATE =================
 const updateProduct = async (req, res) => {
   try {
-
     const { id } = req.params;
     const data = req.body;
 
@@ -182,10 +166,24 @@ const updateProduct = async (req, res) => {
     if (!product) {
       return res.send(message.general_error("Product not found"));
     }
+    const duplicateProduct = await ProductModel.findOne({
+  _id: { $ne: id },
+  $or: [
+    { name: data.name },
+    { slug: data.slug },
+    { sku_id: data.sku_id }
+  ]
+});
 
-    const thumbnail = req.files?.thumbnail;
+if (duplicateProduct) {
+  return res.send(
+    message.general_error("Name / Slug / SKU already exists")
+  );
+}
 
-    // ✅ UPDATE IMAGE
+    const thumbnail = req.files?.thumbnail || null;
+
+    
     if (thumbnail) {
       const name = generateRandomNames(thumbnail.name);
       await thumbnail.mv("./public/images/products/main_images/" + name);
@@ -196,9 +194,22 @@ const updateProduct = async (req, res) => {
       product.thumbnail = name;
     }
 
-    // ✅ SAFE PARSE
-    const category_ids = data.category_ids ? JSON.parse(data.category_ids) : [];
-    const color_ids = data.color_ids ? JSON.parse(data.color_ids) : [];
+    let category_ids = [];
+let color_ids = [];
+
+try {
+  category_ids = data.category_ids
+    ? JSON.parse(data.category_ids)
+    : [];
+
+  color_ids = data.color_ids
+    ? JSON.parse(data.color_ids)
+    : [];
+} catch {
+  return res.send(
+    message.general_error("Invalid category/color data")
+  );
+}
 
     product.name = data.name;
     product.slug = data.slug;
@@ -216,7 +227,6 @@ const updateProduct = async (req, res) => {
     await product.save();
 
     res.send(message.general_success("Product updated"));
-
   } catch (error) {
     console.log(error.message);
     res.send(message.catch_error);
@@ -228,5 +238,5 @@ module.exports = {
   create,
   deleteProduct,
   toggleProduct,
-  updateProduct
+  updateProduct,
 };

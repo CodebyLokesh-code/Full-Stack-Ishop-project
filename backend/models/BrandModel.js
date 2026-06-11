@@ -1,31 +1,44 @@
 const mongoose = require("mongoose");
 
 const BrandSchema = new mongoose.Schema(
-{
-    name:{
-        type:String,
-        unique:true,
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
     },
-    slug:{
-        type:String,
-        unique:true,
-    },
-    status:{
-        type:Boolean,
-        default:true,
-    },
-    image_name:{
-        type:String,
-        unique:true,
-    },
-    category_ids:[
-        {
-            type:mongoose.Schema.ObjectId,
-            ref:"Category"
-        }
-    ]
-}
-)
 
-const BrandModel = mongoose.model("Brand",BrandSchema);
-module.exports = {BrandModel}
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
+
+    status: {
+      type: Boolean,
+      default: true,
+    },
+
+    image_name: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+
+    category_ids: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const BrandModel = mongoose.model("Brand", BrandSchema);
+
+module.exports = { BrandModel };
